@@ -21,8 +21,64 @@ def nlfsr_keystream(length: int, seed: int, offset: int = 0) -> bytes:
     (bit 1 AND bit 7). Output, shifting, offset, and packing match the LFSR.
     """
     _validate(length, (seed,), offset)
-    # TODO(student 7): replace this reference NLFSR in the handout.
-    pass
+    # TODO
+    state = seed
+    cycle = 0
+
+    while True:
+        feedback = (
+            ((state >> 0) & 1)
+            ^ ((state >> 2) & 1)
+            ^ ((state >> 3) & 1)
+            ^ ((state >> 5) & 1)
+            ^ (((state >> 1) & 1) & ((state >> 7) & 1))
+        )
+
+        state = (state >> 1) | (feedback << 15)
+        cycle += 1
+
+        if state == seed:
+            break
+
+    # Move to the requested byte offset
+    state = seed
+
+    for _ in range((offset * 8) % cycle):
+        feedback = (
+            ((state >> 0) & 1)
+            ^ ((state >> 2) & 1)
+            ^ ((state >> 3) & 1)
+            ^ ((state >> 5) & 1)
+            ^ (((state >> 1) & 1) & ((state >> 7) & 1))
+        )
+
+        state = (state >> 1) | (feedback << 15)
+
+    # Generate the output bytes
+    output = []
+
+    for _ in range(length):
+        byte_value = 0
+
+        for _ in range(8):
+            output_bit = state & 1
+
+            feedback = (
+                ((state >> 0) & 1)
+                ^ ((state >> 2) & 1)
+                ^ ((state >> 3) & 1)
+                ^ ((state >> 5) & 1)
+                ^ (((state >> 1) & 1) & ((state >> 7) & 1))
+            )
+
+            state = (state >> 1) | (feedback << 15)
+            byte_value = (byte_value << 1) | output_bit
+
+        output.append(byte_value)
+
+    return bytes(output)
+
+
 
 
 def geffe_keystream(
@@ -38,5 +94,27 @@ def geffe_keystream(
     if len(seeds) != 3:
         raise ValueError("the Geffe generator needs exactly three seeds")
     _validate(length, seeds, offset)
-    # TODO(student 8): replace this reference Geffe generator in the handout.
-    pass
+    # TODO
+    states = list(seeds)
+    output = []
+
+    offset = offset % LFSR_PERIOD_BITS
+
+    for _ in range(offset * 8):
+        for i in range(3):
+            _, states[i] = _next_bit(states[i])
+
+    for _ in range(length):
+        byte_value = 0
+
+        for _ in range(8):
+            x, states[0] = _next_bit(states[0])
+            y, states[1] = _next_bit(states[1])
+            z, states[2] = _next_bit(states[2])
+
+            output_bit = (x & y) ^ ((1 ^ x) & z)
+
+            byte_value = (byte_value << 1) | output_bit
+
+        output.append(byte_value)
+    return bytes(output)
